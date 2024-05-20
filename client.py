@@ -1,13 +1,3 @@
-##
-# client.py - Dropbox client implementation
-##
-
-# ** Optional libraries, uncomment if you need them **
-# Search "python <name> library" for documentation
-# import string  # Python library with useful string constants
-# import dacite  # Helpers for serializing dicts into dataclasses
-# import pymerkle # Merkle tree implementation (CS1620/CS2660 only, but still optional)
-
 # ** Support code libraries ****
 # The following imports load our support code from the "support"
 # directory.  See the Dropbox wiki for usage and documentation.
@@ -25,59 +15,30 @@ from support.keyserver import keyserver
 
 
 class User:
-    def __init__(self, *args) -> None:
-        """
-        Class constructor for the `User` class.
-
-        Initializes a base key for key generation and optionally sets public and private
-        encryption/signature key fields if given.
-
-        Parameters:
-            - un: str - username of the User
-            - pw: str - password of the User
-        Optional Parameters:
-            - pub_key: crypto.AsymmetricEncryptKey - public encryption key of the User
-            - priv_key: crypto.AsymmetricDecryptKey - private decryption key of the User
-            - verify_key: crypto.SignatureVerifyKey - public verification key of the User
-            - sign_key: crypto.SignatureSignKey - private signature key of the User
-            - shared_files: dictionary - stores filenames and owners of files shared to the User
-        Fields:
-            - un: str - username of the User
-            - base_key - base key of the User, used to generate other symmetric keys and memlocs
-            - pub_key: crypto.AsymmetricEncryptKey - public encryption key of the User
-            - priv_key: crypto.AsymmetricDecryptKey - private decryption key of the User
-            - verify_key: crypto.SignatureVerifyKey - public verification key of the User
-            - sign_key: crypto.SignatureSignKey - private signature key of the User
-            - shared_files: dictionary - stores filenames and owners of files shared to the User
-        """
-        if len(args) == 2:
-            self.un, pw = args[0], args[1]
-        elif len(args) == 7:
-            self.un, pw, self.pub_key, self.priv_key, self.verify_key, self.sign_key, self.shared_files = \
-                args[0], args[1], args[2], args[3], args[4], args[5], args[6]
+    def __init__(self, *args):
+        arg_count = len(args)
+        if arg_count == 2:
+            self.un, pw = args
+        elif arg_count == 7:
+            self.un, pw, self.pub_key, self.priv_key, self.verify_key, self.sign_key, self.shared_files = args
         else:
-            raise TypeError("Incorrect number of arguments for User")
+            raise TypeError("Invalid number of arguments for User")
 
-        # generate base key
-        self.base_key = crypto.PasswordKDF(self.un+pw,
-                                           crypto.HashKDF(util.ObjectToBytes(
-                                               self.un+pw), "base_key_salt"),
-                                           16)
+        # Derive a base key from username and password
+        self.base_key = crypto.PasswordKDF(self.un + pw, crypto.HashKDF(util.ObjectToBytes(self.un + pw), "base_key_salt"), 16)
 
-        self.shared_files = dict()
-        # create and push empty shared file dict to the dataserver
+        # Initialize shared files dictionary and store encrypted version on dataserver
+        self.shared_files = {}
         shared_file_loc = generate_memloc(self.base_key, "shared_file_dict")
         shared_file_bytes = util.ObjectToBytes(self.shared_files)
-        enc_shared_files, _ = sym_enc_sign(
-            self.base_key, "shared_file_dict", shared_file_bytes)
+        enc_shared_files, _ = sym_enc_sign(self.base_key, "shared_file_dict", shared_file_bytes)
         dataserver.Set(shared_file_loc, enc_shared_files)
 
-        self.shared_with = dict()
-        # create and push empty shared with dict to dataserver
+        # Initialize shared_with dictionary and store encrypted version on dataserver
+        self.shared_with = {}
         shared_with_loc = generate_memloc(self.base_key, "shared_with_dict")
         shared_with_bytes = util.ObjectToBytes(self.shared_with)
-        enc_shared_with, _ = sym_enc_sign(
-            self.base_key, "shared_with_dict", shared_with_bytes)
+        enc_shared_with, _ = sym_enc_sign(self.base_key, "shared_with_dict", shared_with_bytes)
         dataserver.Set(shared_with_loc, enc_shared_with)
 
     def authenticate(self, username: str, password: str) -> None:
@@ -549,7 +510,7 @@ class User:
         except ValueError:
             raise util.DropboxError("File metadata corrupted.")
 
-        # create a new base key and store it at our memloc for the file's master key
+        # Create a new base key and store it at our memloc for the file's master key
         new_file_key = crypto.HashKDF(
             self.base_key, filename+crypto.SecureRandom(16).decode(errors='backslashreplace'))
         # encrypt & store file key
@@ -840,14 +801,13 @@ def create_user(username: str, password: str) -> User:
 
 def authenticate_user(username: str, password: str) -> User:
     """
-    The specification for this function is at:
-    http://cs.brown.edu/courses/csci1660/dropbox-wiki/client-api/authentication/authenticate-user.html
+    Authenticates a user based on the provided username and password.
     """
-    # Initialize a User object
-    current_user = User(username, password)
+    # Create a User instance with the provided credentials
+    user = User(username, password)
 
-    # call authenticate method to fill out keys
-    current_user.authenticate(username, password)
+    # Complete user authentication process (details likely in User.authenticate)
+    user.authenticate(username, password)
 
-    # If both pass, return the User object
-    return current_user
+    # Return the authenticated User object
+    return user
